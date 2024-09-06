@@ -1,0 +1,12 @@
+{
+ "Config": "ISO_Monitor",
+ "ip1": "192",
+ "ip2": "168",
+ "ip3": "8",
+ "ip4": "70",
+ "serverAdr" : "151",
+ "serverPort" : "5501",
+ "ssid" : "NOLTE_FARM",
+ "password" : "Dontlosemoney89",
+ "URL": "http://30.30.30.151:5500/Sprayer_Central_Controller_1.1.0058.bin"
+}

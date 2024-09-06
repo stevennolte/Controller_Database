@@ -1,0 +1,5 @@
+* udpCheck verifies that AOG data is being recieved to the controller
+* udpTimer is the timestamp of the last message from AOG
+* udpTimeout is the max duration allowed before connection is determined to be lost
+* AOGconnected is the int state of 1=connected, 2=not connected
+
