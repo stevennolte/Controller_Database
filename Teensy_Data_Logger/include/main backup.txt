@@ -1,0 +1,119 @@
+#include <Arduino.h>
+#include <SD.h>
+#include <ADC.h>
+#include <HardwareSerial.h>
+
+#define ARRAY_SIZE 10000
+uint32_t stoptime = 30000;
+struct __attribute__ ((packed)) LogData_t{
+    uint32_t timestamp : 32;
+    uint32_t analogValue : 32;
+  };
+
+  union LogData_u{
+  LogData_t logData_t;
+  uint8_t bytes[sizeof(LogData_t)];
+  };
+
+LogData_u logData[ARRAY_SIZE];
+
+
+// Pin definitions
+const int analogPin = 15; // GPIO14 is A1 (analog pin 14)
+
+// ADC object
+ADC *adc = new ADC();
+
+// SD card settings
+const uint8_t chipSelect = BUILTIN_SDCARD; // Use the built-in SD card
+File logFile; // Change from SdFile to File
+
+// UART for FlasherX updates
+#define BAUD_RATE 115200
+HardwareSerial &uart = Serial2; // Use Serial1 for UART
+
+// // Buffer settings
+// const size_t bufferSize = 1024; // Size of the buffer
+// char logBuffer[bufferSize * 32]; // Allocate enough space for log entries
+// size_t bufferIndex = 0; // Current index in the buffer
+
+void setup() {
+  // Initialize serial
+  Serial.begin(BAUD_RATE);
+  uart.begin(BAUD_RATE);
+
+  // Initialize ADC
+  adc->adc0->setAveraging(8); // Average multiple readings for stability
+  adc->adc0->setResolution(10); // 10-bit resolution
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED); 
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::HIGH_SPEED); 
+
+  // Initialize SD card
+  if (!SD.begin(chipSelect)) {
+    Serial.println("SD card initialization failed!");
+    while (1); // Stay here if initialization fails
+  }
+
+  // Open or create log file
+  logFile = SD.open("data_log.bin", FILE_WRITE);
+  if (!logFile) {
+    Serial.println("Opening log file failed!");
+    while (1); // Stay here if file opening fails
+  }
+
+  // Write CSV header to the file
+  // logFile.println("Time (us), Voltage (V)");
+  logFile.flush(); // Ensure header is written to SD card
+
+  Serial.println("Setup complete.");
+}
+
+void loop() {
+  // Read the analog voltage from GPIO14
+  // int analogValue = adc->adc0->analogRead(analogPin);
+  // float voltage = (analogValue / 1023.0) * 3.3; // Assuming 3.3V reference
+  // uint32_t currentTime = micros(); // Get current time in microseconds
+  // if (millis() < stoptime){
+    for (int i=0; i < ARRAY_SIZE; i++){
+      logData[i].logData_t.analogValue = adc->adc0->analogRead(analogPin);
+      logData[i].logData_t.timestamp = micros();
+    }
+    for (int i=0; i< ARRAY_SIZE; i++){
+      for (int j=0;j<sizeof(LogData_t);j++){
+        logFile.write(logData[i].bytes[j]);
+      }
+      
+    }
+    // logFile.write('\n');
+    logFile.flush();
+    // Get current time in microseconds
+    // Prepare log entry
+    // bufferIndex += sprintf(&logBuffer[bufferIndex], "%lu, %.3f\n", currentTime, voltage);
+
+    // // Check if buffer is full and write to SD card
+    // if (bufferIndex >= (bufferSize * 32)) { // Check if buffer is full
+    //   logFile.print(logBuffer); // Write the entire buffer to the SD card
+    //   logFile.flush(); // Flush data to SD card
+    //   bufferIndex = 0; // Reset buffer index
+    // }
+
+    // // Check for UART communication for firmware update
+    // if (uart.available()) {
+    //   // Read command (assuming FlasherX protocol for update)
+    //   char command = uart.read();
+    //   if (command == 'U') { // Example command to trigger update
+    //     Serial.println("Firmware update requested over UART.");
+    //     // Add FlasherX update logic here
+    //   }
+    // }
+
+    // Add a delay to control logging rate (adjust as needed for speed)
+    // delay(1); // Logging every 1ms, adjust based on your requirements
+    // delayMicroseconds(50);
+  // } else {
+  //   Serial.println("Logging Complete");
+  //   while (true){
+  //     delay(10);
+  //   }
+  // }
+}

@@ -1,0 +1,225 @@
+#include <Arduino.h>
+#include <SD.h>
+#include <ADC.h>
+#include <HardwareSerial.h>
+#include <TeensyThreads.h>
+
+
+void Task1(void *pvParameters);
+void Task2(void *pvParameters);
+
+
+// Define constants for the buffer
+#define ARRAY_SIZE 8           // Size of each array
+#define RING_BUFFER_SIZE 1000    // Number of arrays in the buffer
+
+
+struct __attribute__ ((packed)) LogData_t{
+    uint32_t timestamp : 32;
+    uint32_t analogValue : 32;
+  };
+
+  union LogData_u{
+  LogData_t logData_t;
+  uint8_t bytes[sizeof(LogData_t)];
+  };
+LogData_u logData;
+
+// const int ARRAY_SIZE = sizeof(LogData_t);
+
+// Ring buffer data structure
+int ringBuffer[RING_BUFFER_SIZE][ARRAY_SIZE];  // Each buffer entry is an array
+int writeIndex = 0;
+int readIndex = 0;
+int itemCount = 0;  // Keeps track of the number of arrays in the buffer
+
+
+// Mutex for synchronization
+Threads::Mutex bufferMutex;
+
+// Pin definitions
+const int analogPin = 15; // GPIO14 is A1 (analog pin 14)
+
+// ADC object
+ADC *adc = new ADC();
+
+// SD card settings
+const uint8_t chipSelect = BUILTIN_SDCARD; // Use the built-in SD card
+File logFile; // Change from SdFile to File
+
+// UART for FlasherX updates
+#define BAUD_RATE 115200
+HardwareSerial &uart = Serial2; // Use Serial1 for UART
+
+// Buffer settings
+const size_t bufferSize = 1024; // Size of the buffer
+char logBuffer[bufferSize * 32]; // Allocate enough space for log entries
+size_t bufferIndex = 0; // Current index in the buffer
+
+// Function to add an array to the ring buffer
+void addToRingBuffer(int* data) {
+  if (itemCount < RING_BUFFER_SIZE) {
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+      ringBuffer[writeIndex][i] = data[i];  // Copy the array into the buffer
+    }
+    writeIndex = (writeIndex + 1) % RING_BUFFER_SIZE;
+    itemCount++;
+  } else {
+    Serial.println("Buffer full, cannot add data");
+  }
+}
+
+// Function to read an array from the ring buffer
+void readFromRingBuffer(int* data) {
+  if (itemCount > 0) {
+    for (int i = 0; i < ARRAY_SIZE; i++) {
+      data[i] = ringBuffer[readIndex][i];  // Copy the array from the buffer
+    }
+    readIndex = (readIndex + 1) % RING_BUFFER_SIZE;
+    itemCount--;
+  } else {
+    // Serial.println("Buffer empty, no data to read");
+  }
+}
+
+// Task 1: Runs every 1000 milliseconds
+void sampleDataTask(void *pvParameters) {
+  int data[ARRAY_SIZE];
+  int counter = 0;
+  
+  while (true) {
+    // Generate an array of data
+    // for (int i = 0; i < ARRAY_SIZE; i++) {
+    //   data[i] = counter + i;
+    // }
+    
+    logData.logData_t.analogValue = adc->adc0->analogRead(analogPin);
+    logData.logData_t.timestamp = micros(); // Get current time in microseconds
+    // logData.logData_t.analogValue = 12345;
+    // logData.logData_t.timestamp = 6789; // Get current time in microseconds
+    for (int i = 0; i < ARRAY_SIZE; i++){
+      data[i] = logData.bytes[i];
+    }
+    // Protect the ring buffer with a mutex
+    bufferMutex.lock();
+    addToRingBuffer(data);
+    bufferMutex.unlock();
+
+    // Serial.print("Added to buffer: ");
+    // for (int i = 0; i < ARRAY_SIZE; i++) {
+    //   Serial.print(data[i]);
+    //   Serial.print(" ");
+    // }
+    // // Serial.print("itemCount: ");
+    // // Serial.print(itemCount);
+    // Serial.println();
+
+    counter += ARRAY_SIZE;
+    Threads::yield();
+    // delayMicroseconds(10);  // 1 second delay
+  }
+}
+
+// Task 2: Runs every 500 milliseconds
+void logDataTask(void *pvParameters) {
+  int data[ARRAY_SIZE];
+  
+  while (true) {
+    
+    
+    
+    if (itemCount > 0) {
+      bufferMutex.lock();
+      readFromRingBuffer(data);
+      bufferMutex.unlock();
+      // Serial.print("logDataLoop ");
+      // Serial.println(itemCount);
+      // logFile = SD.open("data_log.bin", FILE_WRITE);
+      // logFile = SD.open("data_log.bin", FILE_WRITE);
+      // Serial.print("\tRead from buffer: ");
+      for (int i = 0; i < ARRAY_SIZE; i++) {
+        // Serial.print(data[i]);
+        // Serial.print(" ");
+        logFile.write(data[i]);
+        delayMicroseconds(5);
+      }
+      // Serial.println();
+      
+      
+      // logFile.write(data,ARRAY_SIZE); // Write the entire buffer to the SD card
+      logFile.write('\n');
+      logFile.flush(); // Flush data to SD card
+      // logFile.close();
+    }
+
+    Threads::yield();
+    // delayMicroseconds(10);
+    // delay(1);  // 500 ms delay
+  }
+}
+
+void setup() {
+  // Initialize serial
+  Serial.begin(BAUD_RATE);
+  uart.begin(BAUD_RATE);
+
+  // Initialize ADC
+  adc->adc0->setAveraging(8); // Average multiple readings for stability
+  adc->adc0->setResolution(10); // 10-bit resolution
+  adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED); 
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::HIGH_SPEED); 
+
+  // Initialize SD card
+  if (!SD.begin(chipSelect)) {
+    Serial.println("SD card initialization failed!");
+    while (1); // Stay here if initialization fails
+  }
+
+  // Open or create log file
+  logFile = SD.open("data_log.bin", FILE_WRITE);
+  if (!logFile) {
+    Serial.println("Opening log file failed!");
+    while (1); // Stay here if file opening fails
+  }
+  // logFile.close();
+
+  // Write CSV header to the file
+  // logFile.println("Time (us), Voltage (V)");
+  // logFile.flush(); // Ensure header is written to SD card
+
+  Serial.println("Setup complete.");
+  // Create a mutex for ring buffer access
+  threads.addThread(sampleDataTask);
+  threads.addThread(logDataTask);
+}
+
+void loop() {
+  // Read the analog voltage from GPIO14
+  // int analogValue = adc->adc0->analogRead(analogPin);
+  // float voltage = (analogValue / 1023.0) * 3.3; // Assuming 3.3V reference
+  // uint32_t currentTime = micros(); // Get current time in microseconds
+
+  // Prepare log entry
+  // bufferIndex += sprintf(&logBuffer[bufferIndex], "%lu, %.3f\n", currentTime, voltage);
+
+  // Check if buffer is full and write to SD card
+  // if (bufferIndex >= (bufferSize * 32)) { // Check if buffer is full
+  //   logFile.print(logBuffer); // Write the entire buffer to the SD card
+  //   logFile.flush(); // Flush data to SD card
+  //   bufferIndex = 0; // Reset buffer index
+  // }
+
+  // Check for UART communication for firmware update
+  if (uart.available()) {
+    // Read command (assuming FlasherX protocol for update)
+    char command = uart.read();
+    if (command == 'U') { // Example command to trigger update
+      Serial.println("Firmware update requested over UART.");
+      // Add FlasherX update logic here
+    }
+  }
+
+  // Add a delay to control logging rate (adjust as needed for speed)
+  // delay(1); // Logging every 1ms, adjust based on your requirements
+  // delay(10);
+}

@@ -1,0 +1,15 @@
+{
+ "Config": "Infineon_Driver",
+ "ip1": "192",
+ "ip2": "168",
+ "ip3": "0",
+ "ip4": "41",
+ "serverAdr" : "249",
+ "serverPort" : "5501",
+ "ssid" : "FERT",
+ "password" : "Fert504!",
+ "URL": "http://30.30.30.151:5500/Infineon_Driver_1.1.1.bin",
+ "default_freq":"10",
+ "default_duty":"0",
+ "pwm_control_state":"0"
+}

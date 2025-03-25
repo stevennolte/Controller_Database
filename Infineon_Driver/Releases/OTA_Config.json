@@ -1,0 +1,9 @@
+{
+    "Configurations": [
+        {
+            "Config": "Infineon_Driver",
+            "Version": "1.2.0219",
+            "URL": "/Infineon_Driver/Releases/Infineon_Driver_1.2.0219.bin"
+        }
+    ]
+}

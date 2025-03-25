@@ -1,6 +1,6 @@
 // #define CANFILTER
 #define CAN1
-
+#define test
 #include <Arduino.h>
 #include <myWifi.h>
 // #include <myPreferences.h>
@@ -20,6 +20,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <vector>
 #include <SPIFFS.h>
+#include "ota.h"
 // #include <ESPAsyncWebSocket.h>
 // put function declarations here:
 
@@ -52,7 +53,7 @@ const long timeoutTime = 2000;
   Adafruit_NeoPixel pixels(1, 48, NEO_GRB + NEO_KHZ800);
   MyWifi myWifi;
   String header;
-  ESP32OTAPull ota;
+  
   AsyncWebServer server(80);
   std::vector<String> debugVars;
   // AsyncWebSocket ws("/ws");
@@ -628,25 +629,18 @@ const char *errtext(int code)
 
 
 #pragma region OTA
-void OtaPullCallback(int offset, int totallength)
-{
-	Serial.printf("Updating %d of %d (%02d%%)...\r", offset, totallength, 100 * offset / totallength);
-// #if defined(LED_BUILTIN) // flicker LED on update
-// 	static int status = LOW;
-// 	status = status == LOW && offset < totallength ? HIGH : LOW;
-// 	digitalWrite(LED_BUILTIN, status);
-// #endif
-}
+// void OtaPullCallback(int offset, int totallength)
+// {
+// 	Serial.printf("Updating %d of %d (%02d%%)...\r", offset, totallength, 100 * offset / totallength);
+// // #if defined(LED_BUILTIN) // flicker LED on update
+// // 	static int status = LOW;
+// // 	status = status == LOW && offset < totallength ? HIGH : LOW;
+// // 	digitalWrite(LED_BUILTIN, status);
+// // #endif
+// }
 
 
 void softwareUpdate(){
-  
-  
-  // String _CONFIG_URL = String(config.ips[0]) + "." + String(config.ips[1]) + "." + String(config.ips[2]) + "." + String(config.serverAddress) + ":" + String(config.serverPort) + "/" + String(config.sketchConfig) + "/" + "Releases" + "/" + "OTA_Config.json";
-  // char* CONFIG_URL;
-  // _CONFIG_URL.toCharArray(CONFIG_URL, sizeof(_CONFIG_URL)+1);
-  // Serial.println(_CONFIG_URL);
-  
   char CONFIG_URL[150];
   sprintf(CONFIG_URL, "http://%d.%d.%d.%d:%d/ISO_Monitor/Releases/OTA_Config.json",Config.ips[0],Config.ips[1],Config.ips[2],Config.serverAddress,Config.serverPort);
   Serial.println(CONFIG_URL);

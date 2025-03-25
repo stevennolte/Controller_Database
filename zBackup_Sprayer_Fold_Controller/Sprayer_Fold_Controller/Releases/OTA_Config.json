@@ -1,0 +1,9 @@
+{
+    "Configurations": [
+        {
+            "Config": "Sprayer_Fold_Controller",
+            "Version": "1.1.0007",
+            "URL": "http://192.168.5.100:5501/Sprayer_Fold_Controller/Releases/Sprayer_Fold_Controller_1.1.0007.bin"
+        }
+    ]
+}
